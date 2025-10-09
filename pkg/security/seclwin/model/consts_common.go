@@ -440,6 +440,14 @@ var (
 		"STATIC":  Static,
 		"DYNAMIC": Dynamic,
 	}
+
+	// UserSessionTypes are the supported user session types
+	// generate_constants:UserSessionTypes,UserSessionTypes are the supported user session types.
+	UserSessionTypes = map[string]usersession.Type{
+		"unknown": usersession.UserSessionTypeUnknown,
+		"k8s":     usersession.UserSessionTypeK8S,
+		"ssh":     usersession.UserSessionTypeSSH,
+	}
 )
 
 var (
@@ -457,6 +465,7 @@ var (
 	compressionTypeStrings     = map[CompressionType]string{}
 	fileTypeStrings            = map[FileType]string{}
 	linkageTypeStrings         = map[LinkageType]string{}
+	UserSessionTypeStrings     = map[usersession.Type]string{}
 )
 
 // File flags
@@ -605,6 +614,12 @@ func initLinkageTypeConstants() {
 		linkageTypeStrings[v] = k
 	}
 }
+func initUserSessionTypes() {
+	for k, v := range UserSessionTypes {
+		seclConstants[k] = &eval.IntEvaluator{Value: int(v)}
+		UserSessionTypeStrings[v] = k
+	}
+}
 
 func initConstants() {
 	initBoolConstants()
@@ -636,7 +651,6 @@ func initConstants() {
 	initExitCauseConstants()
 	initBPFMapNamesConstants()
 	initAUIDConstants()
-	usersession.InitUserSessionTypes()
 	initSSLVersionConstants()
 	initSysCtlActionConstants()
 	initSetSockOptLevelConstants()
@@ -654,6 +668,7 @@ func initConstants() {
 	initSocketFamilyConstants()
 	initSocketProtocolConstants()
 	initPrCtlOptionConstants()
+	initUserSessionTypes()
 }
 
 // RetValError represents a syscall return error value
