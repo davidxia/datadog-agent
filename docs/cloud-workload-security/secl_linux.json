@@ -559,7 +559,7 @@
         },
         {
           "name": "process.ancestors.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -1539,7 +1539,7 @@
         },
         {
           "name": "process.parent.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -1619,7 +1619,7 @@
         },
         {
           "name": "process.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -3182,7 +3182,7 @@
         },
         {
           "name": "exec.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -3731,7 +3731,7 @@
         },
         {
           "name": "exit.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -5694,7 +5694,7 @@
         },
         {
           "name": "ptrace.tracee.ancestors.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -6674,7 +6674,7 @@
         },
         {
           "name": "ptrace.tracee.parent.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -6754,7 +6754,7 @@
         },
         {
           "name": "ptrace.tracee.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -7993,7 +7993,7 @@
         },
         {
           "name": "setrlimit.target.ancestors.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -8973,7 +8973,7 @@
         },
         {
           "name": "setrlimit.target.parent.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -9053,7 +9053,7 @@
         },
         {
           "name": "setrlimit.target.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -9869,7 +9869,7 @@
         },
         {
           "name": "signal.target.ancestors.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -10849,7 +10849,7 @@
         },
         {
           "name": "signal.target.parent.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -10929,7 +10929,7 @@
         },
         {
           "name": "signal.target.user_session.ssh_auth_method",
-          "definition": "SSH authentication method used by the user (password, publickey)",
+          "definition": "SSH authentication method used by the user",
           "property_doc_link": "common-usersessioncontext-ssh_auth_method-doc"
         },
         {
@@ -14192,7 +14192,7 @@
       "name": "*.ssh_auth_method",
       "link": "common-usersessioncontext-ssh_auth_method-doc",
       "type": "int",
-      "definition": "SSH authentication method used by the user (password, publickey)",
+      "definition": "SSH authentication method used by the user",
       "prefixes": [
         "exec.user_session",
         "exit.user_session",
@@ -14209,8 +14209,8 @@
         "signal.target.parent.user_session",
         "signal.target.user_session"
       ],
-      "constants": "",
-      "constants_link": "",
+      "constants": "SSHAuthMethod",
+      "constants_link": "sshauthmethod",
       "examples": []
     },
     {
@@ -20755,6 +20755,21 @@
         },
         {
           "name": "RLIMIT_RTTIME",
+          "architecture": "all"
+        }
+      ]
+    },
+    {
+      "name": "SSHAuthMethod",
+      "link": "sshauthmethod",
+      "description": "SSH authentication methods.",
+      "all": [
+        {
+          "name": "password",
+          "architecture": "all"
+        },
+        {
+          "name": "publickey",
           "architecture": "all"
         }
       ]
