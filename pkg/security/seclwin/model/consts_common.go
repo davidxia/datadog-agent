@@ -448,6 +448,13 @@ var (
 		"k8s":     usersession.UserSessionTypeK8S,
 		"ssh":     usersession.UserSessionTypeSSH,
 	}
+
+	// SSHAuthMethodConstants are the supported SSH authentication methods
+	// generate_constants:SSHAuthMethod,SSH authentication methods.
+	SSHAuthMethodConstants = map[string]uint8{
+		"password":  1,
+		"publickey": 2,
+	}
 )
 
 var (
@@ -465,7 +472,8 @@ var (
 	compressionTypeStrings     = map[CompressionType]string{}
 	fileTypeStrings            = map[FileType]string{}
 	linkageTypeStrings         = map[LinkageType]string{}
-	UserSessionTypeStrings     = map[usersession.Type]string{}
+	userSessionTypeStrings     = map[usersession.Type]string{}
+	sSHAuthMethodStrings       = map[uint8]string{}
 )
 
 // File flags
@@ -617,7 +625,14 @@ func initLinkageTypeConstants() {
 func initUserSessionTypes() {
 	for k, v := range UserSessionTypes {
 		seclConstants[k] = &eval.IntEvaluator{Value: int(v)}
-		UserSessionTypeStrings[v] = k
+		userSessionTypeStrings[v] = k
+	}
+}
+
+func initSSHAuthMethodConstants() {
+	for k, v := range SSHAuthMethodConstants {
+		seclConstants[k] = &eval.IntEvaluator{Value: int(v)}
+		sSHAuthMethodStrings[v] = k
 	}
 }
 
@@ -669,6 +684,7 @@ func initConstants() {
 	initSocketProtocolConstants()
 	initPrCtlOptionConstants()
 	initUserSessionTypes()
+	initSSHAuthMethodConstants()
 }
 
 // RetValError represents a syscall return error value
