@@ -403,6 +403,8 @@ func TestKubeMetadataCollector_getNamespaceMetadata(t *testing.T) {
 }
 
 func TestKubeMetadataCollector_parsePods(t *testing.T) {
+	nodeName := "nodename"
+
 	pods := []*kubelet.Pod{{
 		Metadata: kubelet.PodMetadata{
 			Name:      "foo",
@@ -410,7 +412,7 @@ func TestKubeMetadataCollector_parsePods(t *testing.T) {
 			UID:       "foouid",
 		},
 		Spec: kubelet.Spec{
-			NodeName: "nodename",
+			NodeName: nodeName,
 		},
 		Status: kubelet.Status{
 			Phase: "Running",
@@ -422,14 +424,11 @@ func TestKubeMetadataCollector_parsePods(t *testing.T) {
 			},
 		},
 	}}
-	podsCache := kubelet.PodList{
-		Items: pods,
-	}
 
 	// Cache never expires because the unit tests below are not covering the case
 	// of cache miss. They are only testing parsePods behaves correctly depending
 	// on the cluster agent version and the agent configuration.
-	cache.Cache.Set("KubeletPodListCacheKey", podsCache, -1)
+	cache.Cache.Set("kubeletNodenameCacheKey", nodeName, -1)
 
 	kubeUtilFake := &kubelet.KubeUtil{}
 
