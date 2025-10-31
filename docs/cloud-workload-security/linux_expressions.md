@@ -6000,6 +6000,7 @@ SSH authentication methods.
 | ---- |---------------|
 | `password` | all |
 | `publickey` | all |
+| `unknown` | all |
 
 ### `SetSockopt Levels` {#setsockopt-levels}
 SetSockopt Levels are the supported levels for the setsockopt event.
