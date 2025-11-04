@@ -432,7 +432,7 @@ func TestSSHUserSession(t *testing.T) {
 				return err
 			}
 			return nil
-		}, func(rule *rules.Rule, event *model.Event) bool {
+		}, func(_ *rules.Rule, _ *model.Event) bool {
 			return true
 		}, time.Second*3, "test_rule_ssh_user_session")
 
@@ -528,7 +528,7 @@ func TestSSHUserSessionRotated(t *testing.T) {
 				return err
 			}
 			return nil
-		}, func(rule *rules.Rule, event *model.Event) bool {
+		}, func(_ *rules.Rule, _ *model.Event) bool {
 			return true
 		}, time.Second*3, "test_rule_ssh_user_session")
 

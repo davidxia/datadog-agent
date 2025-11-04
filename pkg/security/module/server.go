@@ -39,7 +39,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/proto/api/transform"
 	"github.com/DataDog/datadog-agent/pkg/security/rules/monitor"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
-	"github.com/DataDog/datadog-agent/pkg/security/secl/model/usersession"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 	"github.com/DataDog/datadog-agent/pkg/security/seclog"
 	"github.com/DataDog/datadog-agent/pkg/security/serializers"
@@ -76,7 +75,7 @@ type pendingMsg struct {
 	retry           int
 	skip            bool
 
-	sshSessionPatcher *sprobe.SSHUserSessionPatcher
+	sshSessionPatcher sshSessionPatcher
 }
 
 func (p *pendingMsg) isResolved() bool {
@@ -456,23 +455,7 @@ func (a *APIServer) SendEvent(rule *rules.Rule, event events.Event, extTagsCb fu
 			}
 		}
 		// Create SSH session patcher if the event has an SSH user session
-		var sshSessionPatcher *sprobe.SSHUserSessionPatcher
-		if ev.ProcessContext.UserSession.ID != 0 && ev.ProcessContext.UserSession.SessionType == int(usersession.UserSessionTypeSSH) {
-			// Access the EBPFProbe to get the UserSessionsResolver
-			if ebpfProbe, ok := a.probe.PlatformProbe.(*sprobe.EBPFProbe); ok {
-				// Create the user session context serializer
-				userSessionCtx := &serializers.UserSessionContextSerializer{
-					ID:          fmt.Sprintf("%x", ev.ProcessContext.UserSession.ID),
-					SessionType: usersession.Type(ev.ProcessContext.UserSession.SessionType).String(),
-					SSHPort:     ev.ProcessContext.UserSession.SSHPort,
-					SSHClientIP: ev.ProcessContext.UserSession.SSHClientIP.IP.String(),
-				}
-				sshSessionPatcher = sprobe.NewSSHUserSessionPatcher(
-					userSessionCtx,
-					ebpfProbe.Resolvers.UserSessionsResolver,
-				)
-			}
-		}
+		sshSessionPatcher := createSSHSessionPatcher(ev, a.probe)
 		timestamp := ev.ResolveEventTime()
 		if timestamp.IsZero() {
 			timestamp = time.Now()
