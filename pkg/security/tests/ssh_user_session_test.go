@@ -390,6 +390,11 @@ func TestSSHUserSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get current user: %v", err)
 	}
+	isLogFileExist, _, _ := getLogFile()
+	// We skip test when we don't have a log file because we don't use journalctl for now
+	if !isLogFileExist {
+		t.Skip("Skip test if log file does not exist")
+	}
 
 	ruleDefs := []*rules.RuleDefinition{
 		{

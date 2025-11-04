@@ -10,13 +10,11 @@ package usersessions
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -65,7 +63,6 @@ type incrementalFileReader struct {
 	offset             int64
 	mu                 sync.Mutex
 	ino                uint64
-	lastRead           time.Time
 	readFromJournalctl bool
 	// chan to stop journalctl
 	stopReading chan struct{} // make(chan struct{}, 1)
@@ -210,24 +207,8 @@ func (r *Resolver) startReading() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
-	switch r.sshLogReader.readFromJournalctl {
-	case true:
-		for {
-			select {
-			case <-r.sshLogReader.stopReading:
-				fmt.Print("WE stop\n")
-				return
-			case <-ticker.C:
-				r.sshLogReader.mu.Lock()
-				err := r.sshLogReader.resolveFromJournalctl(&r.SSHSessionParsed)
-				if err != nil {
-					seclog.Errorf("failed to read journalctl: %v", err)
-				}
-				r.sshLogReader.mu.Unlock()
-
-			}
-		}
-	case false:
+	if !r.sshLogReader.readFromJournalctl {
+		// For now we only read from the ssh log file
 		for {
 			select {
 			case <-r.sshLogReader.stopReading:
@@ -381,40 +362,6 @@ func (ifr *incrementalFileReader) resolveFromLogFile(sshSessionParsed *sshSessio
 	return err
 }
 
-// Lock ifr.mu
-func (ifr *incrementalFileReader) resolveFromJournalctl(sshSessionParsed *sshSessionParsed) error {
-	// format for journalctl
-	sinceStr := ifr.lastRead.Format("2006-01-02 15:04:05")
-
-	cmd := exec.Command("journalctl", "--no-pager", "--since", sinceStr, "--output=short-iso")
-
-	var out bytes.Buffer
-	cmd.Stdout = &out
-
-	if err := cmd.Run(); err != nil {
-		seclog.Errorf("failed to read journalctl: %v", err)
-		return err
-	}
-
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-
-	var lastDate string
-	for i := 0; i < len(lines); i++ {
-		_, lastDate = parseSSHLogLine(lines[i], sshSessionParsed)
-	}
-	if lastDate == "" {
-		return nil
-	}
-	// We update the lastRead like this to avoid skipping another line that could be another ssh session
-	parsedSince, err := time.Parse("2006-01-02T15:04:05-0700", lastDate)
-	if err != nil {
-		seclog.Errorf("failed to parse date from journalctl: %v", err)
-	}
-	ifr.lastRead = parsedSince
-	return nil
-
-}
-
 // close closes the file.
 // The lock of IncrementalFileReader must be held
 func (ifr *incrementalFileReader) close(closeReader bool) error {
@@ -500,10 +447,8 @@ func (r *Resolver) StartSSHUserSessionResolver() error {
 	}
 	// If there is no log file, we use journalctl (atm we do nothing)
 	if path == "" {
-		// // Don't want to continue in case there is no log file, use journalctl instead
-		// r.sshLogReader.lastRead = time.Now()
-		// r.sshLogReader.readFromJournalctl = true
-		// go r.startReading()
+		// // Don't want to continue in case there is no log file
+		// TODO : use journalctl instead
 		return nil
 	}
 
