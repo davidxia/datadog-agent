@@ -226,7 +226,9 @@ func (r *Resolver) startReading() {
 	}
 }
 
-func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) (bool, string) {
+// parseSSHLogLine parse the ssh log line
+// Does not return any error and just automatically updates the LRU when a new session is found
+func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) {
 	type SSHLogLine struct {
 		Date      string
 		Hostname  string
@@ -245,7 +247,7 @@ func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) (bool, str
 	words := strings.Fields(line)
 	sshLogLine := SSHLogLine{}
 	if len(words) < 5 {
-		return false, ""
+		return
 	}
 	switch {
 	// We saw two different types of logs, so we try to parse both
@@ -265,7 +267,7 @@ func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) (bool, str
 			Remaining: strings.Join(words[5:], " "),
 		}
 	default:
-		return false, words[0]
+		return
 	}
 	// if the service is "sshd" and the line starts with "Accepted" it's the beginning of an ssh session
 	if strings.HasPrefix(sshLogLine.Service, "sshd") && strings.HasPrefix(sshLogLine.Remaining, "Accepted") {
@@ -274,7 +276,7 @@ func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) (bool, str
 
 		sshWords := strings.Split(sshLogLine.Remaining, " ")
 		if len(sshWords) < 9 {
-			return false, sshLogLine.Date
+			return
 		}
 		sshParsedLine := SSHParsedLine{
 			AuthentificationMethod: sshWords[1],
@@ -284,7 +286,6 @@ func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) (bool, str
 			SSHVersion:             sshWords[8],
 			Remaining:              strings.Join(sshWords[9:], " "),
 		}
-		// We compare port and IP to ensure that the line is the one we want
 		// Convert string IP to net.IP and compare normalized values
 		parsedIP := net.ParseIP(sshParsedLine.IP)
 
@@ -315,9 +316,7 @@ func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) (bool, str
 
 		sshSessionParsed.Lru.Add(key, value)
 		sshSessionParsed.Mu.Unlock()
-		return true, sshLogLine.Date
 	}
-	return false, sshLogLine.Date
 }
 
 // resolveFromLogFile read all the lines that have been added since the last call without reopening the file.
