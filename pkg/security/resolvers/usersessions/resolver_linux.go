@@ -296,8 +296,10 @@ func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) {
 		case "publickey":
 			authType = usersession.SSHAuthMethodPublicKey
 			// Here Parse the Public Key which can be ED25519 SHA256:J3I5W45pnQtan5u0m27HWzyqAMZfTbG+nRet/pzzylU
-			sshParsedLine.Remaining = strings.Split(sshParsedLine.Remaining, ":")[1]
-			publicKey = sshParsedLine.Remaining
+			parts := strings.SplitN(sshParsedLine.Remaining, ":", 2)
+			if len(parts) == 2 {
+				publicKey = parts[1]
+			}
 		case "password":
 			authType = usersession.SSHAuthMethodPassword
 		// Other types not implemented yet
