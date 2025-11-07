@@ -441,16 +441,17 @@ func (r *Resolver) StartSSHUserSessionResolver() error {
 			break
 		}
 	}
-	// Initialize the SSH log reader
-	r.sshLogReader = &incrementalFileReader{
-		path:        path,
-		stopReading: make(chan struct{}, 1),
-	}
 	// If there is no log file, we use journalctl (atm we do nothing)
 	if path == "" {
 		// // Don't want to continue in case there is no log file
 		// TODO : use journalctl instead
+		seclog.Warnf("no ssh log file found")
 		return nil
+	}
+	// Initialize the SSH log reader
+	r.sshLogReader = &incrementalFileReader{
+		path:        path,
+		stopReading: make(chan struct{}, 1),
 	}
 
 	r.sshLogReader.readFromJournalctl = false
