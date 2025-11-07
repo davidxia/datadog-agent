@@ -30,5 +30,5 @@ bazel:build-deps:windows-amd64:
   variables:
     POWERSHELL_SCRIPT: |-
       [Console]::WriteLine("🟡 TODO(regis): compilation errors remain - limiting to a working subset for the time being")
-      bazel build '@zlib//...' '@libffi//:ffi' '@xz//...'
+      bazel build '@zlib//...' '@libffi//:ffi' '@xz//...' '@cpython//...'
       # bazel build @bzip2//...
