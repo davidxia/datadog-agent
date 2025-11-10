@@ -9,7 +9,6 @@
 package tests
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -26,6 +25,128 @@ import (
 	"github.com/oliveagle/jsonpath"
 	"github.com/stretchr/testify/assert"
 )
+
+// testSSHUser représente un utilisateur de test pour SSH
+type testSSHUser struct {
+	Username string
+	HomeDir  string
+	KeyPath  string
+}
+
+// createTestUser crée un utilisateur système temporaire pour les tests SSH
+func createTestUser() (*testSSHUser, error) {
+	username := fmt.Sprintf("ddtest_ssh_%d", time.Now().Unix())
+
+	// Create a user system with useradd
+	// -r : system user
+	// -m : create home directory
+	// -s : shell
+	// -K MAIL_DIR=/dev/null : deactivate mailbox
+	cmd := exec.Command("sudo", "useradd", "-r", "-m", "-s", "/bin/bash", "-K", "MAIL_DIR=/dev/null", username)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("useradd failed: %v (out: %s)", err, string(out))
+	}
+
+	u, err := user.Lookup(username)
+	if err != nil {
+		_ = exec.Command("sudo", "userdel", "-r", username).Run()
+		return nil, fmt.Errorf("lookup user: %w", err)
+	}
+
+	homeDir := u.HomeDir
+	sshDir := filepath.Join(homeDir, ".ssh")
+
+	// Create the .ssh directory with the correct permissions
+	if err := exec.Command("sudo", "mkdir", "-p", sshDir).Run(); err != nil {
+		_ = exec.Command("sudo", "userdel", "-r", username).Run()
+		return nil, fmt.Errorf("mkdir .ssh: %w", err)
+	}
+
+	if err := exec.Command("sudo", "chmod", "700", sshDir).Run(); err != nil {
+		_ = exec.Command("sudo", "userdel", "-r", username).Run()
+		return nil, fmt.Errorf("chmod .ssh: %w", err)
+	}
+
+	// Generate an ed25519 key pair
+	tmpDir, err := os.MkdirTemp("", "ssh_test_keys_*")
+	if err != nil {
+		_ = exec.Command("sudo", "userdel", "-r", username).Run()
+		return nil, fmt.Errorf("create temp dir: %w", err)
+	}
+
+	keyPath := filepath.Join(tmpDir, "id_test_ed25519")
+	pubPath := keyPath + ".pub"
+
+	cmd = exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-q", "-C", "test-key-"+username)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		_ = exec.Command("sudo", "userdel", "-r", username).Run()
+		return nil, fmt.Errorf("ssh-keygen: %v (out: %s)", err, string(out))
+	}
+
+	// Copy the public key to the authorized_keys file
+	authzPath := filepath.Join(sshDir, "authorized_keys")
+	cmd = exec.Command("sudo", "cp", pubPath, authzPath)
+	if err := cmd.Run(); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		_ = exec.Command("sudo", "userdel", "-r", username).Run()
+		return nil, fmt.Errorf("copy authorized_keys: %w", err)
+	}
+
+	// Définir les bonnes permissions et propriétaire
+	if err := exec.Command("sudo", "chmod", "600", authzPath).Run(); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		_ = exec.Command("sudo", "userdel", "-r", username).Run()
+		return nil, fmt.Errorf("chmod authorized_keys: %w", err)
+	}
+
+	if err := exec.Command("sudo", "chown", "-R", username+":"+username, sshDir).Run(); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		_ = exec.Command("sudo", "userdel", "-r", username).Run()
+		return nil, fmt.Errorf("chown .ssh: %w", err)
+	}
+	return &testSSHUser{
+		Username: username,
+		HomeDir:  homeDir,
+		KeyPath:  keyPath,
+	}, nil
+}
+
+func (u *testSSHUser) cleanup() error {
+	// Delete temporary keys
+	if u.KeyPath != "" {
+		tmpDir := filepath.Dir(u.KeyPath)
+		_ = os.RemoveAll(tmpDir)
+	}
+
+	// Kill all processes of the user
+	_ = exec.Command("sudo", "pkill", "-u", u.Username).Run()
+
+	// Wait until processes are killed
+	time.Sleep(500 * time.Millisecond)
+
+	// Force kill if processes are still running
+	_ = exec.Command("sudo", "pkill", "-9", "-u", u.Username).Run()
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Delete user and home directory
+	cmd := exec.Command("sudo", "userdel", "-r", u.Username)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		// Si userdel -r échoue, essayer avec -f (force) sans -r
+		cmd = exec.Command("sudo", "userdel", "-f", u.Username)
+		if out2, err2 := cmd.CombinedOutput(); err2 != nil {
+			return fmt.Errorf("userdel failed: %v (out: %s), force attempt: %v (out: %s)", err, string(out), err2, string(out2))
+		}
+
+		// Manually delete the home directory if the user was deleted with -f
+		if u.HomeDir != "" && u.HomeDir != "/" && u.HomeDir != "/home" {
+			_ = exec.Command("sudo", "rm", "-rf", u.HomeDir).Run()
+		}
+	}
+
+	return nil
+}
 
 // checkSSHUserSessionJSON check if all the fields in the JSON are valid for a SSH Session
 func checkSSHUserSessionJSON(testMod *testModule, t testing.TB, data []byte) {
@@ -78,105 +199,18 @@ func checkSSHUserSessionJSON(testMod *testModule, t testing.TB, data []byte) {
 	})
 }
 
-func ensureLocalhostSSHAuth() error {
-	u, err := user.Current()
-	if err != nil {
-		return err
-	}
-	home := u.HomeDir
-	sshDir := filepath.Join(home, ".ssh")
-	keyPath := filepath.Join(sshDir, "ci_localhost_ed25519")
-	pubPath := keyPath + ".pub"
-	authz := filepath.Join(sshDir, "authorized_keys")
-
-	// 1) ~/.ssh with good rights
-	if err := os.MkdirAll(sshDir, 0o700); err != nil {
-		return fmt.Errorf("mkdir %s: %w", sshDir, err)
-	}
-	if err := os.Chmod(sshDir, 0o700); err != nil {
-		return fmt.Errorf("chmod %s: %w", sshDir, err)
-	}
-
-	// 2) Generate a key if missing (readable format for OpenSSH)
-	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
-		cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-q")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("ssh-keygen: %v (out: %s)", err, string(out))
-		}
-		_ = os.Chmod(keyPath, 0o600)
-		_ = os.Chmod(pubPath, 0o644)
-	}
-	// 3) Add pubkey if missing
-	pub, err := os.ReadFile(pubPath)
-	if err != nil {
-		return fmt.Errorf("read pub: %w", err)
-	}
-	// Ensure pub ends with newline
-	pubTrimmed := bytes.TrimSpace(pub)
-
-	if _, err := os.Stat(authz); os.IsNotExist(err) {
-		// Create new authorized_keys with the key and a trailing newline
-		if err := os.WriteFile(authz, append(pubTrimmed, '\n'), 0o600); err != nil {
-			return fmt.Errorf("write authorized_keys: %w", err)
-		}
-	} else {
-		existing, err := os.ReadFile(authz)
-		if err != nil {
-			return fmt.Errorf("read authorized_keys: %w", err)
-		}
-		// Check if key already exists
-		if !bytes.Contains(existing, pubTrimmed) {
-			// Instead of appending, rewrite the whole file to ensure proper formatting
-			lines := bytes.Split(existing, []byte("\n"))
-			var validLines [][]byte
-
-			// Keep only non-empty lines
-			for _, line := range lines {
-				if len(bytes.TrimSpace(line)) > 0 {
-					validLines = append(validLines, bytes.TrimSpace(line))
-				}
-			}
-
-			// Add our key
-			validLines = append(validLines, pubTrimmed)
-
-			// Write all lines with proper formatting
-			var content bytes.Buffer
-			for _, line := range validLines {
-				content.Write(line)
-				content.WriteByte('\n')
-			}
-
-			if err := os.WriteFile(authz, content.Bytes(), 0o600); err != nil {
-				return fmt.Errorf("write authorized_keys: %w", err)
-			}
-		}
-	}
-	// Strict rights needs for ssh
-	if err := os.Chmod(authz, 0o600); err != nil {
-		return fmt.Errorf("chmod authorized_keys: %w", err)
-	}
-
-	return nil
-}
-
-func sshLocalhostWithGeneratedKey(remoteCmd string) error {
-	u, err := user.Current()
-	if err != nil {
-		return err
-	}
-	keyPath := filepath.Join(u.HomeDir, ".ssh", "ci_localhost_ed25519")
-
-	// Force key authentification
+// sshConnectAsTestUser se connecte en SSH à localhost en tant que l'utilisateur de test
+func sshConnectAsTestUser(testUser *testSSHUser, remoteCmd string) error {
+	// Se connecter en SSH avec la clé de test
 	args := []string{
-		"-i", keyPath,
+		"-i", testUser.KeyPath,
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-o", "PasswordAuthentication=no",
 		"-o", "PubkeyAuthentication=yes",
 		"-o", "BatchMode=yes",
 		"-o", "LogLevel=ERROR",
-		u.Username + "@localhost",
+		testUser.Username + "@localhost",
 		remoteCmd,
 	}
 
@@ -185,6 +219,7 @@ func sshLocalhostWithGeneratedKey(remoteCmd string) error {
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
+
 func rotateAuthLog(logPath string) error {
 	st, err := os.Stat(logPath)
 	if err != nil {
@@ -222,113 +257,6 @@ func rotateAuthLog(logPath string) error {
 	if err := exec.Command("systemctl", "reload", "rsyslog").Run(); err != nil {
 		_ = exec.Command("bash", "-c", "pidof rsyslogd >/dev/null 2>&1 && kill -HUP $(pidof rsyslogd)").Run()
 	}
-
-	return nil
-}
-
-// backupAuthorizedKeys creates a backup of the authorized_keys file
-// Returns the backup path and any error
-func backupAuthorizedKeys() (string, error) {
-	u, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-
-	authzPath := filepath.Join(u.HomeDir, ".ssh", "authorized_keys")
-	backupPath := authzPath + ".test_backup"
-
-	// Check if authorized_keys exists
-	stat, err := os.Stat(authzPath)
-	if os.IsNotExist(err) {
-		// File doesn't exist, nothing to backup
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("stat authorized_keys: %w", err)
-	}
-
-	// Read original file
-	content, err := os.ReadFile(authzPath)
-	if err != nil {
-		return "", fmt.Errorf("read authorized_keys: %w", err)
-	}
-
-	// Save permissions
-	mode := stat.Mode().Perm()
-
-	// Write backup with same permissions
-	if err := os.WriteFile(backupPath, content, mode); err != nil {
-		return "", fmt.Errorf("write backup: %w", err)
-	}
-
-	// Copy ownership if possible
-	if sys, ok := stat.Sys().(*syscall.Stat_t); ok {
-		_ = os.Chown(backupPath, int(sys.Uid), int(sys.Gid))
-	}
-
-	return backupPath, nil
-}
-
-// restoreAuthorizedKeys restores the authorized_keys file from backup
-func restoreAuthorizedKeys(backupPath string) error {
-	u, err := user.Current()
-	if err != nil {
-		return err
-	}
-
-	authzPath := filepath.Join(u.HomeDir, ".ssh", "authorized_keys")
-
-	if backupPath == "" {
-		// No backup was made, remove the file if it was created by the test
-		return nil
-	}
-
-	// Check if backup exists
-	stat, err := os.Stat(backupPath)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("stat backup: %w", err)
-	}
-
-	// Read backup
-	content, err := os.ReadFile(backupPath)
-	if err != nil {
-		return fmt.Errorf("read backup: %w", err)
-	}
-
-	mode := stat.Mode().Perm()
-
-	// Restore the original file
-	if err := os.WriteFile(authzPath, content, mode); err != nil {
-		return fmt.Errorf("restore authorized_keys: %w", err)
-	}
-
-	// Restore ownership if possible
-	if sys, ok := stat.Sys().(*syscall.Stat_t); ok {
-		_ = os.Chown(authzPath, int(sys.Uid), int(sys.Gid))
-	}
-
-	// Remove backup file
-	_ = os.Remove(backupPath)
-
-	return nil
-}
-
-// cleanupSSHTestFiles removes SSH test artifacts created during tests
-func cleanupSSHTestFiles() error {
-	u, err := user.Current()
-	if err != nil {
-		return err
-	}
-
-	keyPath := filepath.Join(u.HomeDir, ".ssh", "ci_localhost_ed25519")
-	pubPath := keyPath + ".pub"
-
-	// Remove generated SSH keys
-	_ = os.Remove(keyPath)
-	_ = os.Remove(pubPath)
 
 	return nil
 }
@@ -386,20 +314,27 @@ func TestSSHUserSession(t *testing.T) {
 	if testEnvironment == DockerEnvironment {
 		t.Skip("Skip test spawning docker containers on docker")
 	}
-	currentUser, err := user.Current()
-	if err != nil {
-		t.Fatalf("failed to get current user: %v", err)
-	}
+
 	isLogFileExist, _, _ := getLogFile()
 	// We skip test when we don't have a log file because we don't use journalctl for now
 	if !isLogFileExist {
 		t.Skip("Skip test if log file does not exist")
 	}
 
+	testUser, err := createTestUser()
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+	defer func() {
+		if err := testUser.cleanup(); err != nil {
+			t.Logf("warning: failed to cleanup test user: %v", err)
+		}
+	}()
+
 	ruleDefs := []*rules.RuleDefinition{
 		{
 			ID:         "test_rule_ssh_user_session",
-			Expression: `process.user_session.id != 0 && process.user_session.session_type == ssh && exec.user == "` + currentUser.Username + `"`,
+			Expression: `process.user_session.id != 0 && process.user_session.session_type == ssh && exec.user == "` + testUser.Username + `"`,
 		},
 	}
 
@@ -409,25 +344,9 @@ func TestSSHUserSession(t *testing.T) {
 	}
 	defer test.Close()
 
-	// Backup authorized_keys before modifying it
-	backupPath, err := backupAuthorizedKeys()
-	if err != nil {
-		t.Fatalf("failed to backup authorized_keys: %v", err)
-	}
-
-	// Cleanup SSH test artifacts after test completion
-	t.Cleanup(func() {
-		_ = restoreAuthorizedKeys(backupPath)
-		_ = cleanupSSHTestFiles()
-	})
-
 	t.Run("ssh_then_pwd", func(t *testing.T) {
 		err := test.GetEventSent(t, func() error {
-			if err := ensureLocalhostSSHAuth(); err != nil {
-				fmt.Fprintf(os.Stderr, "setup ssh failed: %v\n", err)
-				return err
-			}
-			if err := sshLocalhostWithGeneratedKey("pwd"); err != nil {
+			if err := sshConnectAsTestUser(testUser, "pwd"); err != nil {
 				fmt.Fprintf(os.Stderr, "ssh failed: %v\n", err)
 				return err
 			}
@@ -462,15 +381,26 @@ func TestSSHUserSessionRotated(t *testing.T) {
 		t.Skip("Skip test spawning docker containers on docker")
 	}
 
-	currentUser, err := user.Current()
-	if err != nil {
-		t.Fatalf("failed to get current user: %v", err)
+	isLogFileExist, logPath, inodeBeforeRotate := getLogFile()
+	// We skip test when we don't have a log file because we can't rotate it
+	if !isLogFileExist {
+		t.Skip("Skip test if log file does not exist")
 	}
+
+	testUser, err := createTestUser()
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+	defer func() {
+		if err := testUser.cleanup(); err != nil {
+			t.Logf("warning: failed to cleanup test user: %v", err)
+		}
+	}()
 
 	ruleDefs := []*rules.RuleDefinition{
 		{
 			ID:         "test_rule_ssh_user_session",
-			Expression: `exec.user_session.id != 0 && exec.user_session.session_type == ssh && exec.user == "` + currentUser.Username + `"`,
+			Expression: `exec.user_session.id != 0 && exec.user_session.session_type == ssh && exec.user == "` + testUser.Username + `"`,
 		},
 	}
 
@@ -480,28 +410,9 @@ func TestSSHUserSessionRotated(t *testing.T) {
 	}
 	defer test.Close()
 
-	// Backup authorized_keys before modifying it
-	backupPath, err := backupAuthorizedKeys()
-	if err != nil {
-		t.Fatalf("failed to backup authorized_keys: %v", err)
-	}
-
-	if err := ensureLocalhostSSHAuth(); err != nil {
-		fmt.Fprintf(os.Stderr, "setup ssh failed: %v\n", err)
-		t.Fatal(err)
-	}
-
-	isLogFileExist, logPath, inodeBeforeRotate := getLogFile()
-	// We skip test when we don't have a log file because we can't rotate it
-	if !isLogFileExist {
-		t.Skip("Skip test if log file does not exist")
-	}
-
-	// Cleanup: restore log and remove SSH artifacts after test completion
+	// Cleanup: restore log after test completion
 	t.Cleanup(func() {
 		_ = restoreRotatedLog(logPath)
-		_ = restoreAuthorizedKeys(backupPath)
-		_ = cleanupSSHTestFiles()
 	})
 
 	if err := rotateAuthLog(logPath); err != nil {
@@ -523,7 +434,7 @@ func TestSSHUserSessionRotated(t *testing.T) {
 
 	t.Run("ssh_then_pwd_after_rotation", func(t *testing.T) {
 		err := test.GetEventSent(t, func() error {
-			if err := sshLocalhostWithGeneratedKey("pwd"); err != nil {
+			if err := sshConnectAsTestUser(testUser, "pwd"); err != nil {
 				fmt.Fprintf(os.Stderr, "ssh failed: %v\n", err)
 				return err
 			}
