@@ -37,25 +37,3 @@ type Type uint8
 
 // AuthType is used to identify the SSH authentication method
 type AuthType uint8
-
-func (ust Type) String() string {
-	switch ust {
-	case UserSessionTypeK8S:
-		return "k8s"
-	case UserSessionTypeSSH:
-		return "ssh"
-	default:
-		return "unknown"
-	}
-}
-
-func (authType AuthType) String() string {
-	switch authType {
-	case SSHAuthMethodPassword:
-		return "password"
-	case SSHAuthMethodPublicKey:
-		return "public_key"
-	default:
-		return "unknown"
-	}
-}

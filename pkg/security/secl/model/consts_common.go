@@ -452,9 +452,9 @@ var (
 	// SSHAuthMethodConstants are the supported SSH authentication methods
 	// generate_constants:SSHAuthMethod,SSH authentication methods.
 	SSHAuthMethodConstants = map[string]usersession.AuthType{
-		"password":  usersession.SSHAuthMethodPassword,
-		"publickey": usersession.SSHAuthMethodPublicKey,
-		"unknown":   usersession.SSHAuthMethodUnknown,
+		"password":   usersession.SSHAuthMethodPassword,
+		"public_key": usersession.SSHAuthMethodPublicKey,
+		"unknown":    usersession.SSHAuthMethodUnknown,
 	}
 )
 
@@ -473,8 +473,8 @@ var (
 	compressionTypeStrings     = map[CompressionType]string{}
 	fileTypeStrings            = map[FileType]string{}
 	linkageTypeStrings         = map[LinkageType]string{}
-	userSessionTypeStrings     = map[usersession.Type]string{}
-	sSHAuthMethodStrings       = map[usersession.AuthType]string{}
+	UserSessionTypeStrings     = map[usersession.Type]string{}
+	SSHAuthMethodStrings       = map[usersession.AuthType]string{}
 )
 
 // File flags
@@ -623,17 +623,17 @@ func initLinkageTypeConstants() {
 		linkageTypeStrings[v] = k
 	}
 }
-func initUserSessionTypes() {
+func InitUserSessionTypes() {
 	for k, v := range UserSessionTypes {
 		seclConstants[k] = &eval.IntEvaluator{Value: int(v)}
-		userSessionTypeStrings[v] = k
+		UserSessionTypeStrings[v] = k
 	}
 }
 
-func initSSHAuthMethodConstants() {
+func InitSSHAuthMethodConstants() {
 	for k, v := range SSHAuthMethodConstants {
 		seclConstants[k] = &eval.IntEvaluator{Value: int(v)}
-		sSHAuthMethodStrings[v] = k
+		SSHAuthMethodStrings[v] = k
 	}
 }
 
@@ -684,8 +684,8 @@ func initConstants() {
 	initSocketFamilyConstants()
 	initSocketProtocolConstants()
 	initPrCtlOptionConstants()
-	initUserSessionTypes()
-	initSSHAuthMethodConstants()
+	InitUserSessionTypes()
+	InitSSHAuthMethodConstants()
 }
 
 // RetValError represents a syscall return error value

@@ -279,10 +279,13 @@ func createSSHSessionPatcher(ev *model.Event, p *probe.Probe) sshSessionPatcher 
 	if ev.ProcessContext.UserSession.ID != 0 && ev.ProcessContext.UserSession.SessionType == int(usersession.UserSessionTypeSSH) {
 		// Access the EBPFProbe to get the UserSessionsResolver
 		if ebpfProbe, ok := p.PlatformProbe.(*probe.EBPFProbe); ok {
+			if model.UserSessionTypeStrings == nil {
+				model.InitUserSessionTypes()
+			}
 			// Create the user session context serializer
 			userSessionCtx := &serializers.UserSessionContextSerializer{
 				ID:          fmt.Sprintf("%x", ev.ProcessContext.UserSession.ID),
-				SessionType: usersession.Type(ev.ProcessContext.UserSession.SessionType).String(),
+				SessionType: model.UserSessionTypeStrings[usersession.Type(ev.ProcessContext.UserSession.SessionType)],
 				SSHPort:     ev.ProcessContext.UserSession.SSHPort,
 				SSHClientIP: ev.ProcessContext.UserSession.SSHClientIP.IP.String(),
 			}

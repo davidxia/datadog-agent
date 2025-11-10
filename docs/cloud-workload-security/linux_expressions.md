@@ -5999,7 +5999,7 @@ SSH authentication methods.
 | Name | Architectures |
 | ---- |---------------|
 | `password` | all |
-| `publickey` | all |
+| `public_key` | all |
 | `unknown` | all |
 
 ### `SetSockopt Levels` {#setsockopt-levels}

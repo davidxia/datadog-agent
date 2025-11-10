@@ -987,27 +987,23 @@ func newProcessSerializer(ps *model.Process, e *model.Event) *ProcessSerializer 
 
 func newUserSessionContextSerializer(ctx *model.UserSessionContext, e *model.Event) *UserSessionContextSerializer {
 	e.FieldHandlers.ResolveUserSessionContext(ctx)
-
-	var sshAuthMethod string
-	switch ctx.SSHAuthMethod {
-	case 1:
-		sshAuthMethod = "publickey"
-	case 2:
-		sshAuthMethod = "password"
-	default:
-		sshAuthMethod = ""
+	// Init constants in case they are not initialized yet
+	if model.UserSessionTypeStrings == nil {
+		model.InitUserSessionTypes()
 	}
-
+	if model.SSHAuthMethodStrings == nil {
+		model.InitSSHAuthMethodConstants()
+	}
 	return &UserSessionContextSerializer{
 		ID:            fmt.Sprintf("%x", ctx.ID),
-		SessionType:   usersession.Type(ctx.SessionType).String(),
+		SessionType:   model.UserSessionTypeStrings[usersession.Type(ctx.SessionType)],
 		K8SUsername:   ctx.K8SUsername,
 		K8SUID:        ctx.K8SUID,
 		K8SGroups:     ctx.K8SGroups,
 		K8SExtra:      ctx.K8SExtra,
 		SSHPort:       ctx.SSHPort,
 		SSHClientIP:   ctx.SSHClientIP.IP.String(),
-		SSHAuthMethod: sshAuthMethod,
+		SSHAuthMethod: model.SSHAuthMethodStrings[usersession.AuthType(ctx.SSHAuthMethod)],
 		SSHPublicKey:  ctx.SSHPublicKey,
 	}
 }

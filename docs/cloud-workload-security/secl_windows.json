@@ -2755,7 +2755,7 @@
           "architecture": "all"
         },
         {
-          "name": "publickey",
+          "name": "public_key",
           "architecture": "all"
         },
         {
