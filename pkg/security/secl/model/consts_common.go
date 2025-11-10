@@ -473,8 +473,10 @@ var (
 	compressionTypeStrings     = map[CompressionType]string{}
 	fileTypeStrings            = map[FileType]string{}
 	linkageTypeStrings         = map[LinkageType]string{}
-	UserSessionTypeStrings     = map[usersession.Type]string{}
-	SSHAuthMethodStrings       = map[usersession.AuthType]string{}
+	// UserSessionTypeStrings are the supported user session types
+	UserSessionTypeStrings = map[usersession.Type]string{}
+	// SSHAuthMethodStrings are the supported SSH authentication methods
+	SSHAuthMethodStrings = map[usersession.AuthType]string{}
 )
 
 // File flags
@@ -623,6 +625,8 @@ func initLinkageTypeConstants() {
 		linkageTypeStrings[v] = k
 	}
 }
+
+// InitUserSessionTypes initialize the constants for user session types
 func InitUserSessionTypes() {
 	for k, v := range UserSessionTypes {
 		seclConstants[k] = &eval.IntEvaluator{Value: int(v)}
@@ -630,6 +634,7 @@ func InitUserSessionTypes() {
 	}
 }
 
+// InitSSHAuthMethodConstants initialize the constants for SSH auth methods
 func InitSSHAuthMethodConstants() {
 	for k, v := range SSHAuthMethodConstants {
 		seclConstants[k] = &eval.IntEvaluator{Value: int(v)}
