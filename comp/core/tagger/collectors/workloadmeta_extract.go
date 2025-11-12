@@ -294,7 +294,11 @@ func (c *WorkloadMetaCollector) handleProcess(ev workloadmeta.Event) []*types.Ta
 		}
 
 		for _, tracerMeta := range process.Service.TracerMetadata {
-			parseProcessTags(tagList, tracerMeta.ProcessTags)
+			for key, value := range tracerMeta.Tags() {
+				// Add as low cardinality tag since these are application-level
+				// metadata
+				tagList.AddLow(key, value)
+			}
 		}
 	}
 
@@ -1012,38 +1016,5 @@ func parseContainerADTagsLabels(tags *taglist.TagList, labelValue string) {
 			continue
 		}
 		tags.AddHigh(tagParts[0], tagParts[1])
-	}
-}
-
-// parseProcessTags parses comma-separated process tags from TracerMetadata
-// and adds them to the provided tagList as low cardinality tags
-func parseProcessTags(tags *taglist.TagList, processTags string) {
-	if processTags == "" {
-		return
-	}
-
-	for tag := range strings.SplitSeq(processTags, ",") {
-		tag = strings.TrimSpace(tag)
-		if tag == "" {
-			continue
-		}
-
-		// Split each tag into key:value format
-		key, value, ok := strings.Cut(tag, ":")
-		if !ok {
-			log.Debugf("Process tag %q is not in k:v format, skipping", tag)
-			continue
-		}
-
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-
-		if key == "" || value == "" {
-			log.Debugf("Process tag %q has empty key or value, skipping", tag)
-			continue
-		}
-
-		// Add as low cardinality tag since these are application-level metadata
-		tags.AddLow(key, value)
 	}
 }

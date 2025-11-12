@@ -10,6 +10,7 @@ package tracermetadata
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,9 +50,9 @@ func TestGetTracerMetadata(t *testing.T) {
 
 		tags := trm.GetTags()
 		assert.Equal(t, []string{
-			"service:my-service",
-			"env:my-env",
-			"version:my-version",
+			"tracer_service_name:my-service",
+			"tracer_service_env:my-env",
+			"tracer_service_version:my-version",
 		}, tags)
 	})
 
@@ -72,11 +73,15 @@ func TestGetTracerMetadata(t *testing.T) {
 		require.Equal(t, uint8(2), trm.SchemaVersion)
 		require.NoError(t, err)
 
-		tags := trm.GetTags()
+		var tags []string
+		// Use Tags() instead of GetTags() here to test that function directly too
+		for key, value := range trm.Tags() {
+			tags = append(tags, key+":"+value)
+		}
 		assert.Equal(t, []string{
-			"service:test-go",
-			"env:prod",
-			"version:abc123",
+			"tracer_service_name:test-go",
+			"tracer_service_env:prod",
+			"tracer_service_version:abc123",
 			"entrypoint.basedir:exe",
 			"entrypoint.name:gotrace",
 			"entrypoint.type:executable",
@@ -106,4 +111,77 @@ func createTracerMemfd(t *testing.T, l []byte) {
 	copy(data, l)
 	err = unix.Munmap(data)
 	require.NoError(t, err)
+}
+
+func TestParseProcessTags(t *testing.T) {
+	tests := []struct {
+		name         string
+		processTags  string
+		expectedTags []string
+	}{
+		{
+			name:        "valid comma-separated tags",
+			processTags: "entrypoint.name:com.example.App,service.type:tomcat,service.framework:spring",
+			expectedTags: []string{
+				"entrypoint.name:com.example.App",
+				"service.framework:spring",
+				"service.type:tomcat",
+			},
+		},
+		{
+			name:        "single tag",
+			processTags: "entrypoint.workdir:app",
+			expectedTags: []string{
+				"entrypoint.workdir:app",
+			},
+		},
+		{
+			name:         "empty string",
+			processTags:  "",
+			expectedTags: nil,
+		},
+		{
+			name:        "tags with spaces",
+			processTags: " service.runtime : java-17 , entrypoint.name : com.app.Main ",
+			expectedTags: []string{
+				"entrypoint.name:com.app.Main",
+				"service.runtime:java-17",
+			},
+		},
+		{
+			name:        "tag with colon in value",
+			processTags: "url:http://example.com:8080",
+			expectedTags: []string{
+				"url:http://example.com:8080",
+			},
+		},
+		{
+			name:         "malformed tag without colon",
+			processTags:  "invalid_tag,service.type:nginx",
+			expectedTags: []string{"service.type:nginx"},
+		},
+		{
+			name:         "tags with empty keys or values",
+			processTags:  ":value,key:,service.runtime:python3.9",
+			expectedTags: []string{"service.runtime:python3.9"},
+		},
+		{
+			name:         "empty tag entries",
+			processTags:  "service.framework:django,,entrypoint.name:manage.py,",
+			expectedTags: []string{"entrypoint.name:manage.py", "service.framework:django"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			trm := TracerMetadata{
+				ProcessTags: tt.processTags,
+			}
+
+			tags := trm.GetTags()
+			sort.Strings(tags)
+			sort.Strings(tt.expectedTags)
+			assert.Equal(t, tt.expectedTags, tags)
+		})
+	}
 }
