@@ -276,6 +276,7 @@ func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) {
 
 		sshWords := strings.Split(sshLogLine.Remaining, " ")
 		if len(sshWords) < 9 {
+			seclog.Debugf("fail to parse ssh log line: %s", line)
 			return
 		}
 		sshParsedLine := SSHParsedLine{
@@ -304,6 +305,7 @@ func parseSSHLogLine(line string, sshSessionParsed *sshSessionParsed) {
 			authType = usersession.SSHAuthMethodPassword
 		// Other types not implemented yet
 		default:
+			seclog.Debugf("fail to parse ssh auth type in log line: %s", line)
 			authType = usersession.SSHAuthMethodUnknown
 		}
 		key := SSHSessionKey{
