@@ -1,0 +1,17 @@
+# Each section from every release note are combined when the
+# CHANGELOG.rst is rendered. So the text needs to be worded so that
+# it does not depend on any information only available in another
+# section. This may mean repeating some details, but each section
+# must be readable independently of the other.
+#
+# Each section note must be formatted as reStructuredText.
+---
+features:
+  - |
+    Added Kubernetes orchestrator data export support to the OTEL logs agent exporter.
+    The exporter can now consume Kubernetes resource manifests from the ``k8sobjectsreceiver``
+    and forward them to Datadog's orchestrator endpoint. This enables Kubernetes cluster
+    visibility through the OTEL agent pipeline.
+
+    Configuration is available through the ``OrchestratorConfig`` section with options
+    for cluster name, API key, site, endpoint, and enable/disable toggle.
