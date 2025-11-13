@@ -159,18 +159,6 @@ void *__attribute__((always_inline)) is_discarded(void *discarder_map, void *key
 
 int __attribute__((always_inline)) expire_inode_discarders(u32 mount_id, u64 inode);
 
-struct inode_discarder_params_t *__attribute__((always_inline)) get_inode_discarder_params(u32 mount_id, u64 inode, u32 is_leaf) {
-    struct inode_discarder_t key = {
-        .path_key = {
-            .ino = inode,
-            .mount_id = mount_id,
-        },
-        .is_leaf = is_leaf,
-    };
-
-    return bpf_map_lookup_elem(&inode_discarders, &key);
-}
-
 int __attribute__((always_inline)) discard_inode(u64 event_type, u32 mount_id, u64 inode, u64 timeout, u32 is_leaf) {
     if (!mount_id || !inode) {
         return 0;
