@@ -983,6 +983,8 @@ require (
 
 require go.opentelemetry.io/contrib/instrumentation/runtime v0.63.0
 
+require github.com/stormcat24/protodep v0.1.8 // indirect
+
 // TODO(songy23): remove this once https://github.com/kubernetes/apiserver/commit/b887c9ebecf558a2001fc5c5dbd5c87fd672500c is brought to agent
 replace go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0
 
